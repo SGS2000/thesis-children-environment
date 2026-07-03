@@ -1,0 +1,365 @@
+---
+title: "2 - Indicators"
+author: "Santiago García Sánchez"
+format: html
+editor: source
+---
+
+## Libraries
+
+```{r, warning=F, message=FALSE}
+library(tidyverse)
+library(dlookr)
+library(FactoMineR)
+library(factoextra)
+```
+
+## Data loading
+
+```{r}
+datos <- readRDS("clean_data.rds")
+```
+
+## Indicator 1: Time Spent Outdoors 
+
+Recodificatión:
+```{r}
+# CS_Q3
+datos$CS_Q3_3 <- as.numeric(recode(datos$CS_Q3_3, No = 0, Yes = 1))
+datos <- datos |>
+  mutate(across(
+    starts_with("CS_Q3_") & !all_of("CS_Q3_3"),
+    ~ recode(.x, "Yes" = 2, "No" = 0)
+  ))
+
+# CS_Q5A
+datos <- datos |>
+  mutate(CS_Q5A = as.numeric(recode(CS_Q5A,
+    "Prefer not to say" = 0, "Dont know" = 0, "Never" = 0,
+    "Once or twice" = 1, "Most days" = 2, "Every day" = 2
+  )))
+
+# CS_Q5B
+datos <- datos |>
+  mutate(CS_Q5B = as.numeric(recode(CS_Q5B,
+    "Prefer not to say" = 0, "Dont know" = 0, "Never" = 0,
+    "Once or twice" = 1, "Most days" = 2, "Every day" = 2
+  )))
+```
+
+Computation:
+```{r}
+# Sum of the columns
+datos <- datos |>
+  mutate(
+    Ind1 = rowSums(pick(starts_with("CS_Q3_"), CS_Q5A, CS_Q5B))
+  ) |>
+  # Rescaling
+  mutate(
+    Ind1 = as.numeric(10 * transform(Ind1, method = "minmax"))
+  )
+```
+
+## Indicator 2: Green Spaces at School:
+
+Recodification:
+```{r}
+# CS_QX_3_A
+datos$CS_QX_3_A <- as.numeric(recode(datos$CS_QX_3_A,
+  "Equal time while I was at school, and not at school" = 1,
+  "Mostly when I was not at school" = 0,
+  "Mostly while I was at school" = 2
+))
+
+# CS_QX_3_C
+datos <- datos |>
+  mutate(CS_QX_3_C = case_when(
+    CS_QX_3_B == "Yes, there is more nature" & CS_QX_3_C == "Yes, I enjoy school more" ~ 1,
+    CS_QX_3_B == "Yes, there is less nature" & CS_QX_3_C == "Yes, I enjoy school less" ~ 1,
+    TRUE ~ 0
+  ))
+
+# CS_QX_3_B
+datos$CS_QX_3_B <- as.numeric(recode(datos$CS_QX_3_B,
+  "Yes, there is more nature" = 2,
+  "No, there is the same amount" = 1,
+  .default = 0
+))
+
+
+# CS_QX_4
+datos <- datos |>
+  mutate(across(
+    starts_with("CS_QX_4"),
+    ~ {
+      x <- suppressWarnings(as.numeric(as.character(.)))
+      case_when(
+        x >= 5 & x <= 7 ~ 1,
+        x >= 8 & x <= 10 ~ 2,
+        TRUE ~ 0
+      )
+    }
+  ))
+
+# CS_QX_1
+datos <- datos |>
+  mutate(across(
+    starts_with("CS_QX_1_"),
+    ~ recode(.x, "Yes" = 1, "No" = 0)
+  ))
+```
+
+Computation:
+```{r}
+# Sum of the columns
+datos <- datos |>
+  mutate(
+    Ind2 = rowSums(pick(
+      starts_with("CS_QX_3_"), starts_with("CS_QX_4"),
+      starts_with("CS_QX_1")
+    ), na.rm = TRUE)
+  ) |>
+  # Rescaling
+  mutate(
+    Ind2 = as.numeric(10 * transform(Ind2, method = "minmax"))
+  )
+```
+
+## Indicator 3: Access to Green and Natural Places
+
+Recodification:
+```{r, warning=TRUE}
+# CS_Q4
+datos$CS_Q4_1 <- as.numeric(recode(datos$CS_Q4_1, No = 0, Yes = 1))
+datos$CS_Q4_2 <- as.numeric(recode(datos$CS_Q4_2, No = 0, Yes = 1))
+datos$CS_Q4_3 <- as.numeric(recode(datos$CS_Q4_3, No = 0, Yes = 2))
+datos$CS_Q4_4 <- as.numeric(recode(datos$CS_Q4_4, No = 0, Yes = 2))
+datos$CS_Q4_5 <- as.numeric(recode(datos$CS_Q4_5, No = 0, Yes = 2))
+datos$CS_Q4_6 <- as.numeric(recode(datos$CS_Q4_6, No = 0, Yes = 2))
+datos$CS_Q4_7 <- as.numeric(recode(datos$CS_Q4_7, No = 0, Yes = 2))
+datos$CS_Q4_8 <- as.numeric(recode(datos$CS_Q4_8, No = 0, Yes = 2))
+datos$CS_Q4_9 <- as.numeric(recode(datos$CS_Q4_9, No = 0, Yes = 2))
+datos$CS_Q4_Other <- as.numeric(recode(datos$CS_Q4_Other, No = 0, Yes = 2))
+
+# CS_Q6A
+datos$CS_Q6A <- as.numeric(recode(datos$CS_Q6A,
+  "Every day" = 2, "Most days" = 2, "Once or twice" = 1,
+  .default = 0
+))
+
+# CS_Q6B
+datos$CS_Q6B <- as.numeric(recode(datos$CS_Q6B,
+  "Every day" = 2, "Most days" = 2, "Once or twice" = 1,
+  .default = 0
+))
+```
+
+Calculation:
+```{r}
+# Sum of the columns
+datos <- datos |>
+  mutate(
+    Ind3 = rowSums(pick(starts_with("CS_Q4_"), CS_Q6A, CS_Q6B), na.rm = TRUE)
+  ) |>
+  # Rescaling
+  mutate(
+    Ind3 = as.numeric(10 * transform(Ind3, method = "minmax"))
+  )
+```
+
+## Indicator 4: Quality of Local Natural Spaces
+
+Recodification:
+```{r, warning=FALSE}
+# CS_Q13
+datos <- datos |>
+  mutate(across(
+    starts_with("CS_Q13_"),
+    ~ {
+      x <- as.numeric(as.character(.))
+      case_when(
+        x >= 5 & x <= 7 ~ 1,
+        x >= 8 & x <= 10 ~ 2,
+        TRUE ~ 0
+      )
+    }
+  ))
+```
+
+Calculation:
+```{r}
+# Sum of the columns
+datos <- datos |>
+  mutate(
+    Ind4 = rowSums(pick(starts_with("CS_Q13_")), na.rm = TRUE)
+  ) |>
+  # Rescaling
+  mutate(
+    Ind4 = as.numeric(10 * transform(Ind4, method = "minmax"))
+  )
+```
+
+## Indicator 5: Enjoyment of Nature and Nature Connection:
+
+Recodification:
+```{r, warning=FALSE}
+# CS_Q11
+datos$CS_Q11 <- case_when(
+  as.numeric(datos$CS_Q11) %in% c(1, 2) ~ 0,
+  as.numeric(datos$CS_Q11) %in% c(3, 4, 5) ~ 1,
+  as.numeric(datos$CS_Q11) %in% c(6, 7) ~ 2,
+  TRUE ~ 0
+)
+
+# CS_Q12a
+datos$CS_Q12a <- as.numeric(recode(datos$CS_Q12a,
+  "Completely agree" = 2, "Strongly agree" = 2, "Agree" = 1,
+  .default = 0
+))
+
+# CS_Q5C
+datos$CS_Q5C <- as.numeric(recode(datos$CS_Q5C,
+  "Every day" = 2, "Most days" = 2, "Once or twice" = 1,
+  .default = 0
+))
+
+# CS_Q6C
+datos$CS_Q6C <- as.numeric(recode(datos$CS_Q6C,
+  "Every day" = 2, "Most days" = 2, "Once or twice" = 1,
+  .default = 0
+))
+```
+
+Calculation:
+```{r}
+# Sum of the columns
+datos <- datos |>
+  mutate(
+    Ind5 = rowSums(pick(CS_Q11, CS_Q12a, CS_Q5C, CS_Q6C), na.rm = TRUE)
+  ) |>
+  # Rescaling
+  mutate(
+    Ind5 = as.numeric(10 * transform(Ind5, method = "minmax"))
+  )
+```
+
+## Indicator 6: Environmental Concern and Action
+
+Recodification:
+```{r, warning=FALSE}
+# CS_Q9
+datos$CS_Q9 <- case_when(
+  as.numeric(datos$CS_Q9) %in% c(1, 2) ~ 0,
+  as.numeric(datos$CS_Q9) %in% c(3, 4, 5) ~ 1,
+  as.numeric(datos$CS_Q9) %in% c(6, 7) ~ 2,
+  TRUE ~ 0
+)
+
+# CS_Q12b
+datos$CS_Q12b <- as.numeric(recode(datos$CS_Q12b,
+  "Completely agree" = 2, "Strongly agree" = 2, "Agree" = 1,
+  .default = 0
+))
+
+# CS_Q12c
+datos$CS_Q12c <- as.numeric(recode(datos$CS_Q12c,
+  "Completely agree" = 2, "Strongly agree" = 2, "Agree" = 1,
+  .default = 0
+))
+
+# CS_Q12e
+datos$CS_Q12e <- as.numeric(recode(datos$CS_Q12e,
+  "Completely agree" = 2, "Strongly agree" = 2, "Agree" = 1,
+  .default = 0
+))
+
+# CS_Q10
+datos <- datos |>
+  mutate(across(
+    starts_with("CS_Q10"),
+    ~ recode(.x, "Yes" = 1, "No" = 0)
+  ))
+
+# CS_Q18
+datos$CS_Q18 <- as.numeric(recode(datos$CS_Q18, "Yes" = 1, .default = 0))
+
+# CS_Q16
+datos$CS_Q16_11 <- as.numeric(recode(datos$CS_Q16_11, No = 0, Yes = 1))
+
+datos <- datos |>
+  mutate(across(
+    starts_with("CS_Q16_") & !all_of("CS_Q16_11"),
+    ~ recode(.x, "Yes" = 0, "No" = 1)
+  ))
+
+# CS_Q17
+datos$CS_Q17_8 <- as.numeric(recode(datos$CS_Q17_8, No = 0, Yes = 1))
+
+datos <- datos |>
+  mutate(across(
+    starts_with("CS_Q17_") & !all_of("CS_Q16_8"),
+    ~ recode(.x, "Yes" = 0, "No" = 1)
+  ))
+```
+
+Calculation:
+```{r}
+# Sum of the columns
+datos <- datos |>
+  mutate(
+    Ind6 = rowSums(pick(
+      CS_Q9, CS_Q12b, CS_Q12c, CS_Q12e, starts_with("CS_Q10"),
+      starts_with("CS_Q19"), CS_Q18, starts_with("CS_Q16_"),
+      starts_with("CS_Q17_")
+    ), na.rm = TRUE)
+  ) |>
+  # Rescaling
+  mutate(
+    Ind6 = as.numeric(10 * transform(Ind6, method = "minmax"))
+  )
+```
+
+## Indicator 7: Well-being
+
+PCA is applied to well-being variables:
+```{r}
+vars_pca <- datos[, c(
+  "CS_Wellbeing_happy", "CS_Wellbeing_anxious",
+  "CS_Wellbeing_lonely_num"
+)]
+
+resultados <- PCA(
+  vars_pca,
+  graph = FALSE,
+  row.w = datos$Weight_Percent
+)
+```
+
+Sign is changed:
+```{r}
+resultados$ind$coord[, 1] <- resultados$ind$coord[, 1] * -1
+resultados$var$coord[, 1] <- resultados$var$coord[, 1] * -1
+resultados$var$cor[, 1] <- resultados$var$cor[, 1] * -1
+resultados$svd$V[, 1] <- resultados$svd$V[, 1] * -1
+```
+
+Coordinates for each individual are obtained:
+```{r}
+coord <- get_pca_ind(resultados)$coord |>
+  as_tibble() |>
+  mutate(
+    Dim.1 = as.numeric(10 * transform(Dim.1, method = "minmax")),
+    Dim.2 = as.numeric(10 * transform(Dim.2, method = "minmax")),
+    Dim.3 = as.numeric(10 * transform(Dim.3, method = "minmax"))
+  )
+
+datos$Ind7 <- coord$Dim.1
+```
+
+## Data saving
+
+The dataset with the indicators is saved as a .rds file:
+
+```{r}
+saveRDS(datos, file = "data_indicators.rds")
+```

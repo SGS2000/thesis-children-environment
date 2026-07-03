@@ -1,0 +1,66 @@
+---
+title: "3 - Clusters"
+author: "Santiago García Sánchez"
+format: html
+editor: source
+---
+
+## Libraries
+
+```{r, warning=F, message=FALSE}
+library(tidyverse)
+library(dlookr)
+library(dbrobust)
+library(WeightedCluster)
+```
+
+## Data loading
+
+```{r}
+datos <- readRDS("data_indicators.rds")
+```
+
+## Distance calculation
+
+Gower robust distance matrix is constructed:
+
+```{r}
+dists_gower = robust_distances(datos,
+   cont_vars = c("Ind1", "Ind2", "Ind3", "Ind4", "Ind5", "Ind6", "Ind7",
+                 "means"),
+  bin_vars = c("CS_S_Gender", "CS_S_Age_Band", "poverty"),
+  cat_vars = c("CS_S_SchoolFee_2", "CS_S_SchoolTrip", "Priority_1",
+               "Priority_2", "Priority_3", "access"),
+  w = datos$Weight_Percent)
+```
+
+## Choice of k
+
+Clustering for $k = 2, 3,..., 10$ is computed:
+
+```{r, warning=FALSE}
+ks = wcKMedRange(dists_gower, k = c(2:10), weights = datos$Weight_Percent)
+
+# ASW for different k
+ks$stats["ASW"]
+```
+
+Plot of ASW:
+
+```{r}
+plot(ks, stat=c("ASW", "ASW"), lwd = 3, withlegend = F)
+```
+
+## Construction of clusters
+
+```{r}
+clusts = wcKMedoids(dists_gower, k = 4, weights = datos$Weight_Percent,
+                    method = "KMedoids")
+```
+
+Medoids and number of children by cluster:
+
+```{r}
+table(clusts$clustering)
+```
+

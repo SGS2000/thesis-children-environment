@@ -1,0 +1,449 @@
+---
+title: "1 - Preprocessing"
+author: "Santiago García Sánchez"
+format: html
+editor: source
+---
+
+## Libraries
+
+```{r, warning=F, message=FALSE}
+library(readxl)
+library(tidyverse)
+library(naniar)
+```
+
+## Data loading
+
+Download from [here](http://doi.org/10.5255/UKDA-SN-9174-3).
+
+```{r}
+datos <- read_excel(
+  "childrens_pans_data_waves_1_10_holiday_2021_to_term_2025_safeguarded.xlsx",
+  sheet = 2, col_types = "text" # Data imported as text
+)
+```
+
+## Preprocessing
+
+### Data selection
+
+Only the school wave from 2025 is selected:
+
+```{r}
+datos <- datos |>
+  filter(Year == 2025 & Period == "Term Wave")
+```
+
+Unnecesary columns are removed:
+
+```{r}
+datos$Interview_Date <- NULL
+datos$CS_S_Child_Availability <- NULL
+datos$CS_S_Child_Consent <- NULL
+datos$CS_S_Disability_Consent <- NULL
+datos$Wave <- NULL
+datos$Period <- NULL
+datos$Year <- NULL
+```
+
+Columns with 100% `NA` are removed:
+```{r}
+var_na <- miss_var_summary(datos) |>
+  filter(pct_miss == 100) |>
+  pull(variable)
+
+datos <- datos |>
+  select(!all_of(var_na))
+
+rm(var_na)
+```
+
+Constants are removed:
+
+```{r}
+datos$CS_S_Q1_2 <- NULL
+datos$CS_S_Q1_5 <- NULL
+datos$CS_S_Q3_6 <- NULL
+datos$CS_S_Q3_7 <- NULL
+datos$CS_QX_1_13 <- NULL
+datos$CS_QX_1_14 <- NULL
+datos$CS_Q3_11 <- NULL
+datos$CS_Q3_12 <- NULL
+datos$CS_Q10_14 <- NULL
+datos$CS_Q19_14 <- NULL
+```
+
+Columns that are combinations of other variables are removed:
+
+```{r}
+datos$CS_S_Q3_5 <- NULL
+datos$CS_Q3_13 <- NULL
+datos$CS_Q4_10 <- NULL
+datos$CS_Q4_11 <- NULL
+datos$CS_Q4_12 <- NULL
+datos$CS_QX_1_12 <- NULL
+datos$CS_Q10_15 <- NULL
+datos$CS_Q10_16 <- NULL
+```
+
+### Transforming and recoding
+
+Categorical variables are transformed back to numeric:
+
+```{r, warning=FALSE}
+datos$Weight_Percent <- as.numeric(datos$Weight_Percent)
+
+datos <- datos |>
+  mutate(
+    across(
+      starts_with("CS_S_Q2"),
+      ~ replace_na(as.numeric(ifelse(. == "6 and over", "6", .)), 0)
+    )
+  )
+```
+
+Nominal variables are transformed into factors:
+
+```{r}
+# S (screening)
+datos$CS_S_Region <- as.factor(datos$CS_S_Region)
+datos$CS_S_SchoolFee <- as.factor(datos$CS_S_SchoolFee)
+
+# Q (questions)
+datos$CS_QX_3_B <- as.factor(datos$CS_QX_3_B)
+```
+
+Ordinal variables are transformed into factors:
+
+```{r}
+# S (screening)
+datos$CS_S_SchoolTrip <- factor(datos$CS_S_SchoolTrip,
+  levels = c(
+    "Don’t know", "Never", "Once or twice",
+    "Every term", "Once a month", "At least once a week or more"
+  )
+)
+
+datos$CS_S_Income <- factor(datos$CS_S_Income,
+  levels = c("Prefer not to say", "Dont know", "£0– £14,999", "£15,000–£19,999", "£20,000–£29,999", "£30,000–£39,999", "£40,000–£49,999", "£50,000+")
+)
+
+# Wellbeing
+datos$CS_Wellbeing_happy <- ifelse(datos$CS_Wellbeing_happy == "0 Not at all", "0", datos$CS_Wellbeing_happy)
+datos$CS_Wellbeing_happy <- ifelse(datos$CS_Wellbeing_happy == "10 Completely", "10", datos$CS_Wellbeing_happy)
+datos$CS_Wellbeing_happy <- ifelse(datos$CS_Wellbeing_happy == "Prefer not to say", "5", datos$CS_Wellbeing_happy)
+datos$CS_Wellbeing_happy <- as.numeric(datos$CS_Wellbeing_happy)
+
+datos$CS_Wellbeing_anxious <- ifelse(datos$CS_Wellbeing_anxious == "0 Not at all", "0", datos$CS_Wellbeing_anxious)
+datos$CS_Wellbeing_anxious <- ifelse(datos$CS_Wellbeing_anxious == "10 Completely", "10", datos$CS_Wellbeing_anxious)
+datos$CS_Wellbeing_anxious <- ifelse(datos$CS_Wellbeing_anxious == "Prefer not to say", "5", datos$CS_Wellbeing_anxious)
+datos$CS_Wellbeing_anxious <- as.numeric(datos$CS_Wellbeing_anxious)
+
+datos$CS_Wellbeing_lonely <- factor(datos$CS_Wellbeing_lonely,
+  levels = c("Prefer not to say", "Dont know", "Never", "Hardly ever", "Occasionally", "Some of the time", "Often / always")
+)
+
+# Q (Questions)
+datos$CS_Q5A <- factor(datos$CS_Q5A,
+  levels = c(
+    "Prefer not to say", "Dont know", "Never", "Once or twice",
+    "Most days", "Every day"
+  )
+)
+datos$CS_Q5B <- factor(datos$CS_Q5B,
+  levels = c(
+    "Prefer not to say", "Dont know", "Never", "Once or twice",
+    "Most days", "Every day"
+  )
+)
+datos$CS_Q5C <- factor(datos$CS_Q5C,
+  levels = c(
+    "Prefer not to say", "Dont know", "Never", "Once or twice",
+    "Most days", "Every day"
+  )
+)
+
+datos$CS_Q6A <- factor(datos$CS_Q6A,
+  levels = c(
+    "Prefer not to say", "Dont know", "I don’t have a garden",
+    "Never", "Once or twice", "Most days", "Every day"
+  )
+)
+datos$CS_Q6B <- factor(datos$CS_Q6B,
+  levels = c("Prefer not to say", "Dont know", "Never", "Once or twice", "Most days", "Every day")
+)
+datos$CS_Q6C <- factor(datos$CS_Q6C,
+  levels = c("Prefer not to say", "Dont know", "Never", "Once or twice", "Most days", "Every day")
+)
+
+datos$CS_Q9 <- ifelse(datos$CS_Q9 == "1 Not at all important", "1", datos$CS_Q9)
+datos$CS_Q9 <- ifelse(datos$CS_Q9 == "5 Very important", "5", datos$CS_Q9)
+datos$CS_Q9 <- factor(datos$CS_Q9,
+  levels = c("Dont know", "Prefer not to say", c(1:5))
+)
+
+datos$CS_Q11 <- factor(
+  recode(datos$CS_Q11,
+    A = 1, B = 2, C = 3,
+    D = 4, E = 5, F = 6, G = 7
+  ),
+  levels = 1:7
+)
+
+datos$CS_Q12a <- factor(datos$CS_Q12a,
+  levels = c(
+    "Strongly disagree", "Disagree",
+    "Neither agree nor disagree ", "Agree",
+    "Strongly agree", "Completely agree"
+  )
+)
+datos$CS_Q12b <- factor(datos$CS_Q12b,
+  levels = c(
+    "Completely disagree", "Strongly disagree",
+    "Disagree", "Neither agree nor disagree",
+    "Agree", "Strongly agree", "Completely agree"
+  )
+)
+datos$CS_Q12c <- factor(datos$CS_Q12c,
+  levels = c(
+    "Completely disagree", "Strongly disagree",
+    "Disagree", "Neither agree nor disagree",
+    "Agree", "Strongly agree", "Completely agree"
+  )
+)
+datos$CS_Q12e <- factor(datos$CS_Q12e,
+  levels = c(
+    "Completely disagree", "Strongly disagree",
+    "Disagree", "Neither agree nor disagree",
+    "Agree", "Strongly agree", "Completely agree"
+  )
+)
+
+datos[paste0("CS_Q13_", LETTERS[1:5])] <- lapply(datos[paste0("CS_Q13_", LETTERS[1:5])], function(x) {
+  x <- recode(x,
+    "0 - Disagree a lot"  = "0",
+    "10 - Agree a lot"    = "10"
+  )
+  factor(x, levels = c("Prefer not to say", "Don’t know", as.character(0:10)))
+})
+
+datos$CS_Q18 <- factor(datos$CS_Q18,
+  levels = c("No", "Not sure", "Yes")
+)
+
+datos[paste0("CS_Q20_", 1:7)] <- lapply(datos[paste0("CS_Q20_", 1:7)], function(x) {
+  x <- recode(x,
+    "1 - Most important" = "1",
+    "7 - Least important" = "7"
+  )
+  factor(x, levels = c("Prefer not to say", "Don’t know", as.character(0:7)))
+})
+
+datos$CS_QX_3_A <- factor(datos$CS_QX_3_A,
+  levels = c("Mostly when I was not at school", "Equal time while I was at school, and not at school", "Mostly while I was at school")
+)
+datos$CS_QX_3_C <- factor(datos$CS_QX_3_C,
+  levels = c("Prefer not to say", "Dont know", "Yes, I enjoy school less", "No, I enjoy school the same amount", "Yes, I enjoy school more")
+)
+
+datos[paste0("CS_QX_4_", LETTERS[1:4])] <- lapply(datos[paste0("CS_QX_4_", LETTERS[1:4])], function(x) {
+  x <- recode(x,
+    "0 - Disagree a lot"  = "0",
+    "10 - Agree a lot"    = "10"
+  )
+  factor(x, levels = c("Prefer not to say", "Don’t know", as.character(0:10)))
+})
+```
+
+Binary variables are turned into factors: 
+
+```{r}
+# S (screening)
+datos$CS_S_Age_Band <- factor(datos$CS_S_Age_Band, levels = c("8 to 11", "12 to 15"))
+# Gender is made binary
+datos <- datos |>
+  filter(CS_S_Gender %in% c("Female", "Male"))
+datos$CS_S_Gender <- factor(datos$CS_S_Gender)
+
+# Q (questions)
+datos <- datos |>
+  mutate(across(
+    c(
+      starts_with("CS_Q2_"), starts_with("CS_Q3_"),
+      starts_with("CS_QX_1"), starts_with("CS_QY"),
+      starts_with("CS_Q7"), starts_with("CS_Q8"),
+      starts_with("CS_Q10"), starts_with("CS_Q11"),
+      starts_with("CS_Q16"), starts_with("CS_Q17"),
+      starts_with("CS_Q19")
+    ),
+    as.factor
+  ))
+```
+
+### Creation of new variables
+
+Computing households below the poverty line:
+
+```{r}
+# Calculation of income:
+datos <- datos |>
+  mutate(
+    num = recode(CS_S_Income,
+      "£0– £14,999" = 7500,
+      "£15,000–£19,999" = 17500,
+      "£20,000–£29,999" = 25000,
+      "£30,000–£39,999" = 35000,
+      "£40,000–£49,999" = 45000,
+      "£50,000+" = 75000,
+      .default = NA_real_
+    )
+  )
+
+# Calculation of household size
+datos$denom <- 1 +
+  0.5 * replace_na(datos$CS_S_Q2_3, 0) +
+  0.5 * replace_na(datos$CS_S_Q2_4, 0) +
+  0.3 * replace_na(datos$CS_S_Q2_1, 0) +
+  0.3 * replace_na(datos$CS_S_Q2_2, 0)
+
+
+# Calculation of poverty
+datos$ingresos <- datos$num / datos$denom
+
+mediana <- 33800
+
+datos$poverty <- ifelse(datos$ingresos < 0.6 * mediana, "Yes", "No")
+
+# Temporary variables are removed
+rm(mediana)
+datos$num <- NULL
+datos$denom <- NULL
+datos$ingresos <- NULL
+
+# Missing data is imputed as "Yes"
+datos$poverty <- datos$poverty |>
+  replace_na("Yes")
+```
+
+For question `CS_Q20`, new variables are created showing main incentives by person: 
+
+```{r}
+datos <- datos |>
+  select(c(starts_with("CS_Q20_"), Respondent_ID)) |>
+  pivot_longer(
+    cols = starts_with("CS_Q20_"),
+    names_to = "opcion",
+    values_to = "rango"
+  ) |>
+  mutate(priority = paste0("Priority_", rango)) |>
+  mutate(
+    opcion = recode(opcion,
+      "CS_Q20_1" = "Toilets nearby",
+      "CS_Q20_2" = "Playground",
+      "CS_Q20_3" = "Places to play sports",
+      "CS_Q20_4" = "Safe spaces to cycle",
+      "CS_Q20_5" = "Good weather",
+      "CS_Q20_6" = "Clean air",
+      "CS_Q20_7" = "People around"
+    ),
+    priority = factor(
+      paste0("Priority_", rango),
+      levels = paste0("Priority_", 1:7)
+    )
+  ) |>
+  select(Respondent_ID, priority, opcion) |>
+  pivot_wider(
+    names_from = priority,
+    values_from = opcion
+  ) |>
+  right_join(datos, by = "Respondent_ID") |>
+  relocate(all_of(paste0("Priority_", 1:7)), .after = last_col())
+
+# Mantener solo las primeras tres
+datos <- datos |>
+  select(-Priority_4:-Priority_7)
+```
+
+A numeric version of the `CS_Wellbeing_lonely` variable is created:
+
+```{r}
+datos <- datos |>
+  mutate(
+    CS_Wellbeing_lonely_num = recode(CS_Wellbeing_lonely,
+      "Prefer not to say" = 6,
+      "Dont know" = 6,
+      "Never" = 2,
+      "Hardly ever" = 4,
+      "Occasionally" = 6,
+      "Some of the time" = 8,
+      "Often / always" = 10
+    )
+  )
+```
+
+School type (`CS_S_SchoolFee`) is simplified:
+
+```{r}
+datos <- datos |>
+  mutate(
+    CS_S_SchoolFee_2 = recode(CS_S_SchoolFee,
+      "A State Run School" = "State Run",
+      "A Fee Paying/Independent School" = "Fee Paying",
+      .default = "Other type"
+    )
+  )
+```
+
+Number of means in which the child has heard about the Countryside Code:
+
+```{r}
+datos <- datos |>
+  mutate(
+    across(starts_with("CS_Q19"), ~ recode(.x, "Yes" = 1, "No" = 0)),
+    means = rowSums(across(starts_with("CS_Q19")), na.rm = TRUE)
+  )
+```
+
+Household access to green spaces:
+
+```{r, warning=F}
+datos <- datos |>
+  mutate(
+    CS_S_Q3_3 = recode(CS_S_Q3_3, "No" = 0, "Yes" = 1) |> as.numeric(),
+    across(
+      starts_with("CS_S_Q3_") & -all_of("CS_S_Q3_3"),
+      ~ recode(.x, "No" = 0, "Yes" = 2) |> as.numeric()
+    ),
+    access = rowSums(pick(starts_with("CS_S_Q3_")), na.rm = TRUE),
+    access = recode(
+      access,
+      `0` = "None",
+      `1` = "One",
+      .default = "Two or more"
+    ),
+    access = factor(access, levels = c("None", "One", "Two or more"))
+  )
+```
+
+## Data control
+
+Number of observations:
+
+```{r}
+length(unique(datos$Respondent_ID))
+```
+Variables with missing data:
+
+```{r}
+miss_var_summary(datos) |>
+  filter(n_miss > 0)
+```
+
+## Data saving
+
+Clean data is saved as a .rds file:
+
+```{r}
+saveRDS(datos, file = "clean_data.rds")
+```
